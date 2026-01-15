@@ -1,46 +1,86 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from 'prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
   ) {}
 
   async register(dto: RegisterDto) {
-    // Создаем пользователя
-    const user = await this.usersService.create({
-      email: dto.email,
-      password: dto.password,
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-      phone: dto.phone,
+    // Проверка на существование пользователя
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
     });
 
-    // Генерируем токены
-    const tokens = await this.generateTokens(user.id, user.email, []);
+    if (existingUser) {
+      throw new ConflictException('User with this email already exists');
+    }
 
+    // Хеширование пароля
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    // Создание пользователя
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        phone: dto.phone,
+        isActive: true,
+      },
+      include: {
+        roles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+
+    // Получаем роли
+    const roles = user.roles
+      ?.filter(ur => ur.role)
+      .map(ur => ur.role.name) || [];
+          // Генерируем JWT токен
+    const payload = { 
+      sub: user.id, 
+      email: user.email,
+      roles,
+    };
+    const access_token = await this.jwtService.signAsync(payload);
+
+    // Возвращаем токен + данные пользователя
     return {
-      ...tokens,
+      access_token,
       user: {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        roles: [],
+        roles,
       },
     };
   }
 
   async login(dto: LoginDto) {
     // Находим пользователя
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      include: {
+        roles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -52,23 +92,26 @@ export class AuthService {
     }
 
     // Проверяем пароль
-    const isPasswordValid = await this.usersService.validatePassword(
-      dto.password,
-      user.passwordHash,
-    );
-
-    if (!isPasswordValid) {
+    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!passwordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Получаем роли
-    const roles = user.roles.map((ur) => ur.role.name);
+    const roles = user.roles
+      ?.filter(ur => ur.role)
+      .map(ur => ur.role.name) || [];
 
-    // Генерируем токены
-    const tokens = await this.generateTokens(user.id, user.email, roles);
+    // Генерируем JWT токен
+    const payload = { 
+      sub: user.id, 
+      email: user.email,
+      roles,
+    };
+    const access_token = await this.jwtService.signAsync(payload);
 
     return {
-      ...tokens,
+      access_token,
       user: {
         id: user.id,
         email: user.email,
@@ -77,111 +120,41 @@ export class AuthService {
         roles,
       },
     };
-  }
-
-  async refresh(refreshToken: string) {
-    // Проверяем токен в БД
-    const tokenRecord = await this.prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
-    });
-
-    if (!tokenRecord) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    // Проверяем срок действия
-    if (new Date() > tokenRecord.expiresAt) {
-      await this.prisma.refreshToken.delete({
-        where: { id: tokenRecord.id },
-      });
-      throw new UnauthorizedException('Refresh token expired');
-    }
-
-    // Получаем пользователя
-    const user = await this.usersService.findById(tokenRecord.userId);
-
-    if (!user.isActive) {
-      throw new UnauthorizedException('User account is disabled');
-    }
-
-    // Получаем роли
-    const roles = user.roles.map((ur) => ur.role.name);
-
-    // Удаляем старый refresh token
-    await this.prisma.refreshToken.delete({
-      where: { id: tokenRecord.id },
-    });
-
-    // Генерируем новые токены
-    const tokens = await this.generateTokens(user.id, user.email, roles);
-
-    return {
-      ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        roles,
-      },
-    };
-  }
-
-  async logout(refreshToken: string) {
-    await this.prisma.refreshToken.deleteMany({
-      where: { token: refreshToken },
-    });
-
-    return { message: 'Logged out successfully' };
   }
 
   async getMe(userId: number) {
-    const user = await this.usersService.findById(userId);
-
-    const roles = user.roles.map((ur) => ur.role.name);
-
-    return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phone: user.phone,
-      isActive: user.isActive,
-      roles,
-    };
-  }
-
-  private async generateTokens(userId: number, email: string, roles: string[]) {
-    const payload = {
-      sub: userId,
-      email,
-      roles,
-    };
-
-    // Access token (15 минут)
-    const accessToken = await this.jwtService.signAsync(payload);
-
-    // Refresh token (7 дней)
-    const refreshTokenPayload = { sub: userId };
-    const refreshToken = await this.jwtService.signAsync(refreshTokenPayload, {
-      expiresIn: '7d',
-    });
-
-    // Сохраняем refresh token в БД
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 дней
-
-    await this.prisma.refreshToken.create({
-      data: {
-        token: refreshToken,
-        userId,
-        expiresAt,
+  const user = await this.prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      roles: {
+        include: {
+          role: true,
+        },
       },
-    });
+    },
+  });
 
-    return {
-      accessToken,
-      refreshToken,
-    };
+  if (!user) {
+    throw new UnauthorizedException('User not found');
   }
+
+  // Получаем роли
+  const roles = user.roles
+    ?.filter(ur => ur.role)
+    .map(ur => ur.role.name) || [];
+
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    phone: user.phone,
+    isActive: user.isActive,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    roles,
+  };
 }
+
+}
+

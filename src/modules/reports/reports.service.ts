@@ -640,100 +640,271 @@ export class ReportsService {
   // ============================================
 
   async getDashboard() {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    // Производство за текущий месяц
-    const productionBatches = await this.prisma.productionBatch.count({
+  // ============================================
+  // ПРОИЗВОДСТВО
+  // ============================================
+
+  // Активные заказы
+  const activeOrders = await this.prisma.productionOrder.count({
+    where: {
+      status: {
+        in: ['PLANNED', 'IN_PROGRESS'],
+      },
+    },
+  });
+
+  // Завершенные заказы за месяц
+  const completedOrdersThisMonth = await this.prisma.productionOrder.count({
+    where: {
+      status: 'COMPLETED',
+      updatedAt: {
+        gte: monthStart,
+        lte: monthEnd,
+      },
+    },
+  });
+
+  // Активные партии
+  const activeBatches = await this.prisma.productionBatch.count({
+    where: {
+      status: 'IN_PROGRESS',
+    },
+  });
+
+  // Завершенные партии за месяц
+  const completedBatches = await this.prisma.productionBatch.count({
+    where: {
+      status: 'COMPLETED',
+      productionDate: {
+        gte: monthStart,
+        lte: monthEnd,
+      },
+    },
+  });
+
+  // Общее количество партий за месяц
+  const totalBatches = await this.prisma.productionBatch.count({
+    where: {
+      productionDate: {
+        gte: monthStart,
+        lte: monthEnd,
+      },
+    },
+  });
+
+  // Эффективность (процент завершенных партий)
+  const efficiency = totalBatches > 0 
+    ? Math.round((completedBatches / totalBatches) * 100) 
+    : 0;
+
+  // ============================================
+  // СКЛАД
+  // ============================================
+
+  // Всего активных материалов
+  const totalMaterials = await this.prisma.material.count({
+    where: { isActive: true },
+  });
+
+  // Материалы с низкими остатками
+  const materials = await this.prisma.material.findMany({
+    where: {
+      isActive: true,
+      minStock: { not: null },
+    },
+    include: {
+      stockItems: true,
+    },
+  });
+
+  const lowStockMaterials = materials.filter(material => {
+    const totalQuantity = material.stockItems.reduce(
+      (sum, item) => sum + Number(item.quantity),
+      0,
+    );
+    return material.minStock && totalQuantity < Number(material.minStock);
+  }).length;
+
+  // Материалы с истекающим сроком годности (менее 30 дней)
+  const thirtyDaysFromNow = new Date();
+  thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+  const expiringMaterials = await this.prisma.stockItem.count({
+    where: {
+      expiryDate: {
+        not: null,
+        lte: thirtyDaysFromNow,
+        gte: now,
+      },
+    },
+  });
+
+  // Общая стоимость материалов (заглушка, т.к. у нас нет цен)
+  const totalValue = materials.reduce((sum, material) => {
+    const totalQuantity = material.stockItems.reduce(
+      (itemSum, item) => itemSum + Number(item.quantity),
+      0,
+    );
+    // Примерная стоимость (можно добавить поле price в Material)
+    const estimatedPrice = 1000; // 1000 руб за единицу
+    return sum + (totalQuantity * estimatedPrice);
+  }, 0);
+
+  // ============================================
+  // СЕРВИСНЫЕ РАБОТЫ
+  // ============================================
+
+  // Активные сервисные заказы
+  const activeServiceOrders = await this.prisma.serviceOrder.count({
+    where: {
+      status: {
+        in: ['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD'],
+      },
+    },
+  });
+
+  // Завершенные сервисные заказы за месяц
+  const completedServiceOrdersThisMonth = await this.prisma.serviceOrder.count({
+    where: {
+      status: 'COMPLETED',
+      updatedAt: {
+        gte: monthStart,
+        lte: monthEnd,
+      },
+    },
+  });
+
+  // Просроченные заказы
+  const overdueOrders = await this.prisma.serviceOrder.count({
+    where: {
+      status: {
+        not: 'COMPLETED',
+      },
+      plannedEnd: {
+        lt: now,
+      },
+    },
+  });
+
+  // Загрузка инженеров (средний процент)
+  const engineers = await this.prisma.user.findMany({
+    where: {
+      roles: {
+        some: {
+          role: {
+            name: {
+              in: ['ENGINEER', 'SERVICE_MANAGER'],
+            },
+          },
+        },
+      },
+      isActive: true,
+    },
+    include: {
+      serviceAssignments: {
+        where: {
+          order: {
+            status: {
+              in: ['ASSIGNED', 'IN_PROGRESS'],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const totalEngineers = engineers.length;
+  const busyEngineers = engineers.filter(e => e.serviceAssignments.length > 0).length;
+  const engineersWorkload = totalEngineers > 0 
+    ? Math.round((busyEngineers / totalEngineers) * 100) 
+    : 0;
+
+  // ============================================
+  // ГРАФИК ПРОИЗВОДСТВА (последние 7 дней)
+  // ============================================
+
+  const productionChartData: Array<{
+  date: string;
+  planned: number;
+  actual: number;
+  }> = [];
+
+  
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    date.setHours(0, 0, 0, 0);
+    
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + 1);
+
+    // Плановое количество (из заказов)
+    const plannedOrders = await this.prisma.productionOrder.findMany({
+      where: {
+        plannedDate: {
+          gte: date,
+          lt: nextDate,
+        },
+      },
+    });
+
+    const planned = plannedOrders.reduce((sum, order) => sum + Number(order.plannedQty), 0);
+
+    // Фактическое количество (из партий)
+    const actualBatches = await this.prisma.productionBatch.findMany({
       where: {
         productionDate: {
-          gte: monthStart,
-          lte: monthEnd,
+          gte: date,
+          lt: nextDate,
         },
         status: 'COMPLETED',
       },
     });
 
-    const totalProduced = await this.prisma.productionBatch.aggregate({
-      where: {
-        productionDate: {
-          gte: monthStart,
-          lte: monthEnd,
-        },
-        status: 'COMPLETED',
-      },
-      _sum: {
-        producedQty: true,
-      },
+    const actual = actualBatches.reduce((sum, batch) => sum + Number(batch.producedQty), 0);
+
+    productionChartData.push({
+      date: date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+      planned: Math.round(planned),
+      actual: Math.round(actual),
     });
+  }
 
-    // Сервисные работы за текущий месяц
-    const serviceOrders = await this.prisma.serviceOrder.count({
-      where: {
-        createdAt: {
-          gte: monthStart,
-          lte: monthEnd,
-        },
-      },
-    });
+  // ============================================
+  // ВОЗВРАТ ДАННЫХ
+  // ============================================
 
-    const completedServiceOrders = await this.prisma.serviceOrder.count({
-      where: {
-        createdAt: {
-          gte: monthStart,
-          lte: monthEnd,
-        },
-        status: 'COMPLETED',
-      },
-    });
-
-    // Низкие остатки на складе
-    const materials = await this.prisma.material.findMany({
-      where: {
-        isActive: true,
-        minStock: { not: null },
-      },
-      include: {
-        stockItems: true,
-      },
-    });
-
-    const lowStockCount = materials.filter(material => {
-      const totalQuantity = material.stockItems.reduce(
-        (sum, item) => sum + Number(item.quantity),
-        0,
-      );
-      return material.minStock && totalQuantity < Number(material.minStock);
-    }).length;
-
-    // Активные пользователи
-    const activeUsers = await this.prisma.user.count({
-      where: { isActive: true },
-    });
-
-    return {
-      period: {
-        month: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
-        from: monthStart,
-        to: monthEnd,
-      },
+  return {
+    period: {
+      month: now.toLocaleString('ru-RU', { month: 'long', year: 'numeric' }),
+      from: monthStart,
+      to: monthEnd,
+    },
+    dashboardStats: {
       production: {
-        batchesCompleted: productionBatches,
-        totalProduced: totalProduced._sum.producedQty || 0,
-      },
-      service: {
-        totalOrders: serviceOrders,
-        completedOrders: completedServiceOrders,
-        completionRate: serviceOrders > 0 ? ((completedServiceOrders / serviceOrders) * 100).toFixed(2) : 0,
+        activeOrders,
+        completedOrdersThisMonth,
+        activeBatches,
+        efficiency,
       },
       inventory: {
-        lowStockMaterials: lowStockCount,
-        totalActiveMaterials: materials.length,
+        totalMaterials,
+        lowStockMaterials,
+        expiringMaterials,
+        totalValue,
       },
-      users: {
-        activeUsers,
+      service: {
+        activeOrders: activeServiceOrders,
+        completedOrdersThisMonth: completedServiceOrdersThisMonth,
+        engineersWorkload,
+        overdueOrders,
       },
-    };
-  }
+    },
+    productionChartData,
+  };
+}
 }
