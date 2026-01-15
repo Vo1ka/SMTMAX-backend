@@ -1,0 +1,420 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ПОЛЬЗОВАТЕЛИ И РОЛИ
+// ============================================
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  phone         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  roles         UserRole[]
+  productionBatches ProductionBatch[]
+  serviceAssignments ServiceAssignment[]
+  workLogs      WorkLog[]
+  auditLogs     AuditLog[]
+  
+  @@map("users")
+}
+
+model Role {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  permissions Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  users       UserRole[]
+  
+  @@map("roles")
+}
+
+model UserRole {
+  userId    Int
+  roleId    Int
+  assignedAt DateTime @default(now())
+  
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ============================================
+// ПРОИЗВОДСТВО
+// ============================================
+
+model Recipe {
+  id          Int       @id @default(autoincrement())
+  name        String
+  code        String    @unique
+  description String?
+  version     String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  ingredients RecipeIngredient[]
+  parameters  RecipeParameter[]
+  batches     ProductionBatch[]
+  orders      ProductionOrder[]
+  
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id         Int     @id @default(autoincrement())
+  recipeId   Int
+  materialId Int
+  quantity   Decimal @db.Decimal(10, 4)
+  unit       String
+  
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  material   Material @relation(fields: [materialId], references: [id])
+  
+  @@map("recipe_ingredients")
+}
+
+model RecipeParameter {
+  id          Int     @id @default(autoincrement())
+  recipeId    Int
+  name        String
+  value       String
+  unit        String?
+  minValue    Decimal? @db.Decimal(10, 4)
+  maxValue    Decimal? @db.Decimal(10, 4)
+  
+  recipe      Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  
+  @@map("recipe_parameters")
+}
+
+model ProductionOrder {
+  id            Int      @id @default(autoincrement())
+  orderNumber   String   @unique
+  recipeId      Int
+  plannedQty    Decimal  @db.Decimal(10, 2)
+  unit          String
+  plannedDate   DateTime
+  deadline      DateTime?
+  status        String
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  recipe        Recipe @relation(fields: [recipeId], references: [id])
+  batches       ProductionBatch[]
+  
+  @@index([status])
+  @@map("production_orders")
+}
+
+model ProductionBatch {
+  id              Int      @id @default(autoincrement())
+  batchNumber     String   @unique
+  orderId         Int?
+  recipeId        Int
+  producedQty     Decimal  @db.Decimal(10, 2)
+  unit            String
+  productionDate  DateTime
+  producedBy      Int
+  status          String
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  order           ProductionOrder? @relation(fields: [orderId], references: [id])
+  recipe          Recipe @relation(fields: [recipeId], references: [id])
+  producer        User @relation(fields: [producedBy], references: [id])
+  parameters      BatchParameter[]
+  materialUsage   MaterialUsage[]
+  stockMovements  StockMovement[]
+  
+  @@map("production_batches")
+}
+
+model BatchParameter {
+  id        Int     @id @default(autoincrement())
+  batchId   Int
+  name      String
+  value     String
+  unit      String?
+  isInRange Boolean @default(true)
+  
+  batch     ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  
+  @@map("batch_parameters")
+}
+
+// ============================================
+// СКЛАД И МАТЕРИАЛЫ
+// ============================================
+
+model Material {
+  id            Int       @id @default(autoincrement())
+  name          String
+  code          String    @unique
+  category      String
+  unit          String
+  minStock      Decimal?  @db.Decimal(10, 2)
+  description   String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  recipeIngredients RecipeIngredient[]
+  stockItems    StockItem[]
+  movements     StockMovement[]
+  materialUsage MaterialUsage[]
+  inventoryCheckItems InventoryCheckItem[]
+  
+  @@map("materials")
+}
+
+model StockItem {
+  id            Int       @id @default(autoincrement())
+  materialId    Int
+  lotNumber     String?
+  quantity      Decimal   @db.Decimal(10, 2)
+  unit          String
+  expiryDate    DateTime?
+  supplierId    Int?
+  receivedDate  DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  material      Material @relation(fields: [materialId], references: [id])
+  supplier      Contractor? @relation(fields: [supplierId], references: [id])
+  movements     StockMovement[]
+  
+  @@map("stock_items")
+}
+
+model StockMovement {
+  id            Int       @id @default(autoincrement())
+  materialId    Int
+  stockItemId   Int?
+  movementType  String
+  quantity      Decimal   @db.Decimal(10, 2)
+  unit          String
+  batchId       Int?
+  serviceOrderId Int?
+  documentNumber String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  
+  material      Material @relation(fields: [materialId], references: [id])
+  stockItem     StockItem? @relation(fields: [stockItemId], references: [id])
+  batch         ProductionBatch? @relation(fields: [batchId], references: [id])
+  serviceOrder  ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+model MaterialUsage {
+  id          Int     @id @default(autoincrement())
+  batchId     Int
+  materialId  Int
+  quantity    Decimal @db.Decimal(10, 4)
+  unit        String
+  
+  batch       ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  material    Material @relation(fields: [materialId], references: [id])
+  
+  @@map("material_usage")
+}
+
+model InventoryCheck {
+  id            Int       @id @default(autoincrement())
+  checkNumber   String    @unique
+  checkDate     DateTime
+  status        String
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  items         InventoryCheckItem[]
+  
+  @@map("inventory_checks")
+}
+
+model InventoryCheckItem {
+  id            Int     @id @default(autoincrement())
+  checkId       Int
+  materialId    Int
+  systemQty     Decimal @db.Decimal(10, 2)
+  actualQty     Decimal @db.Decimal(10, 2)
+  difference    Decimal @db.Decimal(10, 2)
+  unit          String
+  notes         String?
+  
+  check         InventoryCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  material      Material @relation(fields: [materialId], references: [id])
+  
+  @@map("inventory_check_items")
+}
+
+
+// ============================================
+// ПУСКОНАЛАДОЧНЫЕ РАБОТЫ
+// ============================================
+
+model ServiceOrder {
+  id              Int       @id @default(autoincrement())
+  orderNumber     String    @unique
+  customerId      Int
+  equipmentType   String
+  equipmentModel  String?
+  location        String
+  description     String
+  plannedStart    DateTime?
+  plannedEnd      DateTime?
+  actualStart     DateTime?
+  actualEnd       DateTime?
+  status          String
+  priority        String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  customer        Contractor @relation(fields: [customerId], references: [id])
+  assignments     ServiceAssignment[]
+  workLogs        WorkLog[]
+  documents       ServiceDocument[]
+  stockMovements  StockMovement[]
+  
+  @@index([status])
+  @@map("service_orders")
+}
+
+model ServiceAssignment {
+  id          Int       @id @default(autoincrement())
+  orderId     Int
+  engineerId  Int
+  assignedAt  DateTime  @default(now())
+  notes       String?
+  
+  order       ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  engineer    User @relation(fields: [engineerId], references: [id])
+  
+  @@map("service_assignments")
+}
+
+model WorkLog {
+  id          Int       @id @default(autoincrement())
+  orderId     Int
+  engineerId  Int
+  workDate    DateTime
+  startTime   DateTime
+  endTime     DateTime?
+  description String
+  result      String?
+  status      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  order       ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  engineer    User @relation(fields: [engineerId], references: [id])
+  
+  @@map("work_logs")
+}
+
+model ServiceDocument {
+  id          Int       @id @default(autoincrement())
+  orderId     Int
+  docType     String
+  fileName    String
+  filePath    String
+  fileSize    Int
+  uploadedAt  DateTime  @default(now())
+  
+  order       ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@map("service_documents")
+}
+
+// ============================================
+// КОНТРАГЕНТЫ
+// ============================================
+
+model Contractor {
+  id          Int       @id @default(autoincrement())
+  name        String
+  type        String
+  inn         String?
+  kpp         String?
+  address     String?
+  phone       String?
+  email       String?
+  contactPerson String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  serviceOrders ServiceOrder[]
+  stockItems    StockItem[]
+  
+  @@map("contractors")
+}
+
+// ============================================
+// АУДИТ И УВЕДОМЛЕНИЯ
+// ============================================
+
+model AuditLog {
+  id          Int       @id @default(autoincrement())
+  userId      Int?
+  action      String
+  entity      String
+  entityId    Int
+  changes     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+  
+  user        User? @relation(fields: [userId], references: [id])
+  
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@map("refresh_tokens")
+}
+
+
+model Notification {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  type        String
+  title       String
+  message     String
+  isRead      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId, isRead])
+  @@map("notifications")
+}
