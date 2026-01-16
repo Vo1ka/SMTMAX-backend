@@ -23,7 +23,7 @@ import { QueryWorkLogsDto } from './dto/query-work-logs.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from 'src/common/decorators/roles.decorators';
+import { Roles } from 'common/decorators/roles.decorators';
 
 
 @ApiTags('Service Orders')

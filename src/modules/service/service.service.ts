@@ -6,8 +6,8 @@ import { QueryServiceOrdersDto } from './dto/query-service-orders.dto';
 import { AssignEngineerDto } from './dto/assign-engineer.dto';
 import { CreateWorkLogDto } from './dto/create-work-log.dto';
 import { UpdateWorkLogDto } from './dto/update-work-log.dto';
-import { QueryWorkLogsDto } from './dto/query-work-logs.dto';
-import { PrismaService } from 'prisma/prisma.service';
+import { QueryWorkLogsDto } from './dto/query-work-logs.dto';import { PrismaService} from '../../prisma/prisma.service';
+
 
 @Injectable()
 export class ServiceService {

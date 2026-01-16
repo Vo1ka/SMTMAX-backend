@@ -5,8 +5,8 @@ import { QueryProductionOrdersDto } from './dto/query-production-orders.dto';
 import { CreateProductionBatchDto } from './dto/create-production-batch.dto';
 import { UpdateProductionBatchDto } from './dto/update-production-batch.dto';
 import { AddBatchParameterDto } from './dto/add-batch-parameter.dto';
-import { QueryProductionBatchesDto } from './dto/query-production-batches.dto';
-import { PrismaService } from 'prisma/prisma.service';
+import { QueryProductionBatchesDto } from './dto/query-production-batches.dto';import { PrismaService} from '../../prisma/prisma.service';
+
 import { UpdateBatchStatusDto } from './dto/update-batch-batch.dto';
 import { UpdateOrderStatusDto } from './dto/update-status-order.dto';
 

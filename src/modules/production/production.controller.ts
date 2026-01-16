@@ -22,9 +22,9 @@ import { QueryProductionBatchesDto } from './dto/query-production-batches.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from 'src/common/decorators/roles.decorators';
 import { UpdateBatchStatusDto } from './dto/update-batch-batch.dto';
 import { UpdateOrderStatusDto } from './dto/update-status-order.dto';
+import { Roles } from 'common/decorators/roles.decorators';
 
 @ApiTags('Production')
 @Controller('production')

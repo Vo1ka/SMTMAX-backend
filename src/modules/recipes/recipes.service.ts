@@ -2,8 +2,8 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { QueryRecipesDto } from './dto/query-recipes.dto';
 
 import { AddParameterDto } from './dto/add-parameter.dto';
-import { UpdateParameterDto } from './dto/update-parameter.dto';
-import { PrismaService } from 'prisma/prisma.service';
+import { UpdateParameterDto } from './dto/update-parameter.dto';import { PrismaService} from '../../prisma/prisma.service';
+
 import { AddIngredientDto } from './dto/add-ingridient.dto';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import { UpdateIngredientDto } from './dto/update-ingridient.dto';

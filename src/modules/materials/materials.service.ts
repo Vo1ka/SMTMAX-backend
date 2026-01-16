@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { PrismaService } from 'prisma/prisma.service';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';import { PrismaService} from '../../prisma/prisma.service';
+
 import { CreateMaterialDto } from './dto/create-material.dto';
 import { QueryMaterialsDto } from './dto/query-material.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';

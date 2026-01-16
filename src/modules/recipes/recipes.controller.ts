@@ -21,7 +21,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AddIngredientDto } from './dto/add-ingridient.dto';
 import { UpdateIngredientDto } from './dto/update-ingridient.dto';
-import { Roles } from 'src/common/decorators/roles.decorators';
+import { Roles } from 'common/decorators/roles.decorators';
 
 @ApiTags('Recipes')
 @Controller('recipes')

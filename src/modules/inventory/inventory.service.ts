@@ -8,7 +8,8 @@ import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { QueryInventoryChecksDto } from './dto/query-inventory-checks.dto';
 import { QueryStockItemsDto } from './dto/query-stock-item.dto';
 import { QueryStockMovementsDto } from './dto/query-stock-movement.dto';
-import { PrismaService } from 'prisma/prisma.service';
+import { PrismaService} from '../../prisma/prisma.service';
+
 
 @Injectable()
 export class InventoryService {

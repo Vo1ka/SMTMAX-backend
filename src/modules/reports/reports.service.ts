@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ProductionReportQueryDto } from './dto/production-report-query.dto';
 import { StockReportQueryDto } from './dto/stock-report-query.dto';
-import { ServiceReportQueryDto } from './dto/service-report-query.dto';
-import { PrismaService } from 'prisma/prisma.service';
+import { ServiceReportQueryDto } from './dto/service-report-query.dto';import { PrismaService} from '../../prisma/prisma.service';
+
 
 @Injectable()
 export class ReportsService {

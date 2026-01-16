@@ -11,7 +11,7 @@ import { StockReportQueryDto } from './dto/stock-report-query.dto';
 import { ServiceReportQueryDto } from './dto/service-report-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorators';
+import { Roles } from 'common/decorators/roles.decorators';
 
 
 @ApiTags('Reports')

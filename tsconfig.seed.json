@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["prisma/seed.ts"],
+  "compilerOptions": {
+    "rootDir": "./prisma",
+    "module": "commonjs",
+    "target": "es2019",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "outDir": "./dist-seed"
+  }
+}

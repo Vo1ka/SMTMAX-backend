@@ -3,7 +3,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { QueryUsersDto } from './dto/query-roles.dto';
-import { PrismaService } from 'prisma/prisma.service';
+import { PrismaService} from '../../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {

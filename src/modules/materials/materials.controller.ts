@@ -16,7 +16,7 @@ import { CreateMaterialDto } from './dto/create-material.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorators';
+import { Roles } from 'common/decorators/roles.decorators';
 import { QueryMaterialsDto } from './dto/query-material.dto';
 
 @ApiTags('Materials')

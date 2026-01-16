@@ -21,9 +21,9 @@ import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { QueryInventoryChecksDto } from './dto/query-inventory-checks.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorators';
 import { QueryStockItemsDto } from './dto/query-stock-item.dto';
 import { QueryStockMovementsDto } from './dto/query-stock-movement.dto';
+import { Roles } from 'common/decorators/roles.decorators';
 
 @ApiTags('Inventory')
 @Controller('inventory')
