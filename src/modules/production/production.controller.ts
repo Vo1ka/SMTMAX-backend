@@ -24,7 +24,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateBatchStatusDto } from './dto/update-batch-batch.dto';
 import { UpdateOrderStatusDto } from './dto/update-status-order.dto';
-import { Roles } from 'common/decorators/roles.decorators';
+import { Roles } from '../../common/decorators/roles.decorators';
 
 @ApiTags('Production')
 @Controller('production')

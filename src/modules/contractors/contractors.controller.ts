@@ -16,7 +16,7 @@ import { CreateContractorDto } from './dto/create-contractor.dto';
 import { UpdateContractorDto } from './dto/update-contractor.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from 'common/decorators/roles.decorators';
+import { Roles } from '../../common/decorators/roles.decorators';
 
 
 @ApiTags('Contractors')

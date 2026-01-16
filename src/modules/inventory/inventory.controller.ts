@@ -23,7 +23,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { QueryStockItemsDto } from './dto/query-stock-item.dto';
 import { QueryStockMovementsDto } from './dto/query-stock-movement.dto';
-import { Roles } from 'common/decorators/roles.decorators';
+import { Roles } from '../../common/decorators/roles.decorators';
 
 @ApiTags('Inventory')
 @Controller('inventory')
